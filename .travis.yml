@@ -1,0 +1,36 @@
+sudo: required
+language: generic
+
+services:
+  - docker
+
+before_install:
+  - docker build -t stadom/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true stadom/react-test npm test
+
+after_success:
+  - docker build -t stadom/multi-client ./client
+  - docker build -t stadom/multi-nginx ./nginx
+  - docker build -t stadom/multi-server ./server
+  - docker build -t stadom/multi-worker ./worker
+  # Log in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push them to docker hub
+  - docker push stadom/multi-client
+  - docker push stadom/multi-nginx
+  - docker push stadom/multi-server
+  - docker push stadom/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: 'eu-central-1'
+  app: 'app-docker-multi'
+  env: 'Appdockermulti-env'
+  bucket_name: 'elasticbeanstalk-eu-central-1-817076261729'
+  bucket_path: 'docker-multi'
+  on:
+    branch: main
+  access_key_id: $AWS_ACCESS_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY
